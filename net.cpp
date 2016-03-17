@@ -1,6 +1,7 @@
 #include <stddef.h>
 #include <sys/socket.h>
 #include <string.h>
+#include <stdio.h>
 
 class NetException {} nex;
 
@@ -50,7 +51,6 @@ void write_primitive(int socket, T value) {
 }
 
 void write_string(int socket, char *str) {
+    write_primitive(socket, strlen(str));
     raw_send(socket, strlen(str), str);
 }
-
-int main() {}

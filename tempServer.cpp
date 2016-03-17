@@ -8,7 +8,7 @@
 #include <stdio.h>  /* for perror() */
 #include <stdlib.h> /* for exit() */
 #include "chars.h"
-
+#include "net.cpp"
 
 class TCPServer {
 
@@ -33,8 +33,8 @@ public:
     void run();
 
     int init();
-    int receiveMessage( char** );
-    int sendMessage( char* );
+    char* receiveMessage();
+    void sendMessage(char*);
 
 private:
 
@@ -45,7 +45,7 @@ private:
 };
 
 
-int main(int argc, char *argv[])
+int main(int argc, char **argv)
 {
 
     TCPServer server(8080, 0);
@@ -75,11 +75,15 @@ void TCPServer::run() {
             die("TCP_NODELAY failed");
 
         char *buff = NULL;
-        size_t size = 0;
-        while (this->receiveMessage(&buff) == 0) {
-            printf("-> %s\n<- ", buff);
-            if (getCharArray(&buff, size) != 0 || this->sendMessage(buff) != 0)
-                break;
+        try {
+            while (true) {
+                buff = this->receiveMessage();
+                printf("-> %s\n", buff);
+                this->sendMessage(buff);
+                delete[] buff;
+            }
+        } catch (NetException n) {
+            printf("net error");
         }
     }
 }
@@ -105,67 +109,46 @@ int TCPServer::init() {
     return 0;
 }
 
-int TCPServer::sendMessage(char *message) {
-    size_t messageSize = STRLEN(message) * sizeof(char);
-
-    if (send(clntSock, (char*)&messageSize, sizeof(size_t), 0) != sizeof(size_t))
-        return printError("send() failed to send message");
-
-    if (send(clntSock, message, messageSize, 0) != messageSize)
-        return printError("send() failed to send message");
-
-    return 0;
+void TCPServer::sendMessage(char *message) {
+    write_string(clntSock, message);
 }
 
-int TCPServer::receiveMessage(char **message) {
-    size_t size = 0;
-    if (recv(clntSock, (char*)&size, sizeof(size_t), 0) != sizeof(size_t))
-        return printError("Error in receiving message size");
-
-    char *receivedMessage = new char[size + 1];
-
-    if (recv(clntSock, (char*)receivedMessage, size, 0) != size)
-        return printError("Error in receiving message");
-
-    if (*message != NULL)
-        delete [] *message;
-
-    *message = receivedMessage;
-    return 0;
+char* TCPServer::receiveMessage() {
+    return read_string(clntSock);
 }
 
-void TCPServer::handle() {
-    long long c_ts;                     /* current read timestamp */
-    char *message = new char[50];
-    int value = 1;
-
-    if (quickAck && setsockopt(clntSock, IPPROTO_TCP, TCP_QUICKACK, (char *)&value, sizeof(int)) < 0)
-        die("TCP_QUICKACK failed");
-
-    size_t size = 0;
-    while (recv(clntSock, (char*)&size, sizeof(size_t), 0) == sizeof(size_t)) {
-
-        if (recv(clntSock, message, size, 0) == size) {
-            die("receive() failed");
-        }
-        printf("%s\n", message);
-
-        // Enable quickAck
-        if (quickAck && setsockopt(clntSock, IPPROTO_TCP, TCP_QUICKACK, (char *)&value, sizeof(int)) < 0)
-            die("TCP_QUICKACK failed");
-
-        /* Echo message back to client */
-        /*if (send(clntSock, (char*)&c_ts, sizeof(c_ts), 0) != sizeof(c_ts))
-            die("send() failed to send timestamp");*/
-
-        // Enable quickAck
-        if (quickAck && setsockopt(clntSock, IPPROTO_TCP, TCP_QUICKACK, (char *)&value, sizeof(int)) < 0)
-            die("TCP_QUICKACK failed");
-    }
-
-    delete [] message;
-    close(clntSock);    /* Close client socket */
-}
+//void TCPServer::handle() {
+//    long long c_ts;                     /* current read timestamp */
+//    char *message = new char[50];
+//    int value = 1;
+//
+//    if (quickAck && setsockopt(clntSock, IPPROTO_TCP, TCP_QUICKACK, (char *)&value, sizeof(int)) < 0)
+//        die("TCP_QUICKACK failed");
+//
+//    size_t size = 0;
+//    while (recv(clntSock, (char*)&size, sizeof(size_t), 0) == sizeof(size_t)) {
+//
+//        if (recv(clntSock, message, size, 0) == size) {
+//            die("receive() failed");
+//        }
+//        printf("%s\n", message);
+//
+//        // Enable quickAck
+//        if (quickAck && setsockopt(clntSock, IPPROTO_TCP, TCP_QUICKACK, (char *)&value, sizeof(int)) < 0)
+//            die("TCP_QUICKACK failed");
+//
+//        /* Echo message back to client */
+//        /*if (send(clntSock, (char*)&c_ts, sizeof(c_ts), 0) != sizeof(c_ts))
+//            die("send() failed to send timestamp");*/
+//
+//        // Enable quickAck
+//        if (quickAck && setsockopt(clntSock, IPPROTO_TCP, TCP_QUICKACK, (char *)&value, sizeof(int)) < 0)
+//            die("TCP_QUICKACK failed");
+//    }
+//
+//    delete [] message;
+//    close(clntSock);    /* Close client socket */
+//}
 
 TCPServer::TCPServer( unsigned short echoServPort, unsigned short quickAck ) :
     echoServPort (echoServPort),
