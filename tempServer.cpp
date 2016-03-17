@@ -7,11 +7,12 @@
 #include <unistd.h>     /* for close() */
 #include <stdio.h>  /* for perror() */
 #include <stdlib.h> /* for exit() */
-
+#include "chars.h"
 
 
 class TCPServer {
 
+    #define STRLEN(s) ({int retval = 0; while (*(s + ++retval)); retval;})
     #define MAXPENDING 1
 
     int servSock;                    /* Socket descriptor for server */
@@ -31,11 +32,16 @@ public:
 
     void run();
 
+    int init();
+    int receiveMessage( char** );
+    int sendMessage( char* );
+
 private:
 
     void handle();
     // Printing the errorMessage and exit with 1
     void die( const char*);
+    int printError( const char* );
 };
 
 
@@ -44,28 +50,13 @@ int main(int argc, char *argv[])
 
     TCPServer server(8080, 0);
 
+    server.init();
     server.run();
 
     return 0;
 }
 
 void TCPServer::run() {
-    if ((servSock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
-        die("socket() failed");
-
-    memset(&echoServAddr, 0, sizeof(echoServAddr));   /* Zero out structure */
-    echoServAddr.sin_family = AF_INET;                /* Internet address family */
-    echoServAddr.sin_addr.s_addr = htonl(INADDR_ANY); /* Any incoming interface */
-    echoServAddr.sin_port = htons(echoServPort);      /* Local port */
-
-    /* Bind to the local address */
-    if (bind(servSock, (struct sockaddr *) &echoServAddr, sizeof(echoServAddr)) < 0)
-        die("bind() failed");
-
-    /* Mark the socket so it will listen for incoming connections */
-    if (listen(servSock, MAXPENDING) < 0)
-        die("listen() failed");
-
     for (;;) {
         /* Set the size of the in-out parameter */
         clntLen = sizeof(echoClntAddr);
@@ -83,8 +74,64 @@ void TCPServer::run() {
         if (setsockopt(clntSock, IPPROTO_TCP, TCP_NODELAY, (char *)&value, sizeof(int)) < 0)
             die("TCP_NODELAY failed");
 
-        this->handle();
+        char *buff = NULL;
+        size_t size = 0;
+        while (this->receiveMessage(&buff) == 0) {
+            printf("-> %s\n<- ", buff);
+            if (getCharArray(&buff, size) != 0 || this->sendMessage(buff) != 0)
+                break;
+        }
     }
+}
+
+int TCPServer::init() {
+    if ((servSock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
+        return printError("socket() failed");
+
+    memset(&echoServAddr, 0, sizeof(echoServAddr));   /* Zero out structure */
+    echoServAddr.sin_family = AF_INET;                /* Internet address family */
+    echoServAddr.sin_addr.s_addr = htonl(INADDR_ANY); /* Any incoming interface */
+    echoServAddr.sin_port = htons(echoServPort);      /* Local port */
+
+    /* Bind to the local address */
+    if (bind(servSock, (struct sockaddr *) &echoServAddr, sizeof(echoServAddr)) < 0)
+        return printError("bind() failed");
+
+    /* Mark the socket so it will listen for incoming connections */
+    if (listen(servSock, MAXPENDING) < 0)
+        return printError("listen() failed");
+
+    printf("Initialization finished\n");
+    return 0;
+}
+
+int TCPServer::sendMessage(char *message) {
+    size_t messageSize = STRLEN(message) * sizeof(char);
+
+    if (send(clntSock, (char*)&messageSize, sizeof(size_t), 0) != sizeof(size_t))
+        return printError("send() failed to send message");
+
+    if (send(clntSock, message, messageSize, 0) != messageSize)
+        return printError("send() failed to send message");
+
+    return 0;
+}
+
+int TCPServer::receiveMessage(char **message) {
+    size_t size = 0;
+    if (recv(clntSock, (char*)&size, sizeof(size_t), 0) != sizeof(size_t))
+        return printError("Error in receiving message size");
+
+    char *receivedMessage = new char[size + 1];
+
+    if (recv(clntSock, (char*)receivedMessage, size, 0) != size)
+        return printError("Error in receiving message");
+
+    if (*message != NULL)
+        delete [] *message;
+
+    *message = receivedMessage;
+    return 0;
 }
 
 void TCPServer::handle() {
@@ -124,6 +171,12 @@ TCPServer::TCPServer( unsigned short echoServPort, unsigned short quickAck ) :
     echoServPort (echoServPort),
     quickAck (quickAck)
 {}
+
+int TCPServer::printError(const char *errorMessage)
+{
+    perror(errorMessage);
+    return -1;
+}
 
 void TCPServer::die(const char *errorMessage)
 {
