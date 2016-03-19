@@ -7,6 +7,7 @@
 #include <unistd.h>     /* for close() */
 #include <sys/time.h>
 #include "chars.h"
+#include "net.cpp"
 
 class TCPClient {
 
@@ -32,8 +33,8 @@ public:
     };
 
     int connectToServer();
-    int receiveMessage( char ** );
-    int sendMessage( char * );
+    char* receiveMessage();
+    void sendMessage(char *);
 private:
 
     int printError(const char *);
@@ -48,8 +49,9 @@ int TCPClient::printError(const char *errorMessage)
 }
 
 TCPClient::TCPClient( char *IP, unsigned short port) :
-    servIP (IP),
-    echoServPort (port)
+        echoServPort (port),
+        servIP (IP)
+
 {}
 
 
@@ -74,36 +76,12 @@ int TCPClient::connectToServer() {
     return 0;
 }
 
-int TCPClient::receiveMessage(char **message) {
-    size_t size = 0;
-    if (recv(sock, (char*)&size, sizeof(size_t), 0) != sizeof(size_t))
-        return printError("Error in receiving message size");
-
-    char *receivedMessage = new char[size + 1];
-
-    if (recv(sock, (char*)receivedMessage, size, 0) != size)
-        return printError("Error in receiving message");
-
-    if (*message != NULL)
-        delete [] *message;
-
-    *message = receivedMessage;
-    return 0;
+char* TCPClient::receiveMessage() {
+    return read_string(sock);
 }
 
-int TCPClient::sendMessage(char *message) {
-
-    size_t messageSize = STRLEN(message) * sizeof(char);
-
-    if (send(sock, (char*)&messageSize, sizeof(size_t), 0) != sizeof(size_t)) {
-        die("send() failed to send message");
-    }
-
-    if (send(sock, message, messageSize, 0) != messageSize) {
-        die("send() failed to send message");
-    }
-
-    return 0;
+void TCPClient::sendMessage(char *msg) {
+    write_string(sock, msg);
 }
 
 void TCPClient::die(const char *errorMessage)
@@ -115,9 +93,9 @@ void TCPClient::die(const char *errorMessage)
 
 
 
-int main(int argc, char *argv[])
+int main(int argc, char **argv)
 {
-    char *IP = "127.0.0.1";
+    char IP[] = "127.0.0.1";
 
     TCPClient client(IP, 8080);
 
@@ -126,19 +104,23 @@ int main(int argc, char *argv[])
     printf("Connected to server %s\n", IP);
     printf("Enter the message:\n");
 
-    char *message = new char[50];
-    size_t size = 0;
-    while (true) {
-        printf("<- ");
-        if (getCharArray(&message, size) != 0 || client.sendMessage(message) != 0)
-            break;
-        if (client.receiveMessage(&message) != 0)
-            break;
-        printf("-> %s\n", message);
+    char *message = NULL;
+    size_t size = 100;
+    int len = 0;
+    try {
+        while (true) {
+            printf("<- ");
+            if ((len = getline(&message, &size, stdin)) == -1) break;
+            if (len > 0 && message[len - 1] == '\n') {
+                message[len - 1] = 0;
+            }
+            client.sendMessage(message);
+            printf("-> %s\n", client.receiveMessage());
+        }
+    } catch (NetException n) {
+        printf("net error");
     }
-    scanf("%s\n", message);
 
     delete [] message;
-
     return 0;
 }
