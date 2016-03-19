@@ -1,0 +1,144 @@
+\documentclass[a4paper,12pt]{extarticle}
+
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage{graphicx}
+\usepackage[left=1.5cm,right=1.5cm,top=2cm,bottom=2cm]{geometry}
+\usepackage{amsmath, amsfonts, mathtools}
+%\usepackage{indentfirst}
+\makeatletter
+\renewcommand{\@listI}{%
+	\topsep=0pt }
+\makeatother
+
+\makeatletter
+\let\old@itemize=\itemize
+\def\itemize{\old@itemize
+	\setlength{\itemsep}{0pt}
+	\setlength{\parskip}{0pt}
+	\setlength{\leftskip}{5pt}
+}
+\makeatother
+
+\makeatletter
+\let\old@enumerate=\enumerate
+\def\enumerate{\old@enumerate
+	\setlength{\itemsep}{0pt}
+	\setlength{\parskip}{0pt}
+	\setlength{\leftskip}{5pt}
+}\makeatother
+
+
+\begin{document}
+	\title{Разработка группового проекта\\Версия 0.1}
+	\date{\today}
+	\maketitle
+
+	\setlength{\parskip}{0.5ex}
+	
+	\section{Задание}
+	Написание многопоточного чата на $\approx\!\!1000$ человек.	Возможности:
+	\begin{enumerate}
+		\item написание сообщений самому себе, другому пользователю или в комнату,
+		\item возможность отправления статических картинок и ссылок,
+		\item поддержка шифрования,
+		\item хранение истории; получение истории и статистики,
+		\item доставка непрочитанных сообщений при запуске,
+		\item возможность пересылать сообщения,
+		\item возможность узнать, прочитано сообщение или нет,
+		\item передача файлов,
+		\item получение статуса пользователя,
+		\item mb общение p2p с шифрованием,
+		\item mb возможность отмечать сообщения избранными.
+	\end{enumerate}
+	
+	\section{Термины}
+	\begin{enumerate}
+		\item \em user \em~--- пользователь:
+			\begin{itemize}
+				\item логин
+				\item user\_id
+				\item пароль
+			\end{itemize}
+			
+		\item \em room \em~--- комната:
+		\begin{itemize}
+			\item room\_id
+			\item список пользователей~--- [user\_id]
+			\item название
+		\end{itemize}
+		
+		\item \em message \em~--- сообщение:
+		\begin{itemize}
+			\item user\_id отправителя
+			\item room\_id получателей
+			\item тема
+			\item время
+			\item текст
+		\end{itemize}
+		
+		\item \em picture \em~--- картинка:
+		\begin{itemize}
+			\item picture\_id
+			\item данные изображения
+		\end{itemize}
+	\end{enumerate}
+	
+	\section{Реализация}
+	Выбрана клиент-серверная архитектура.
+	
+	\noindent
+	Функции сервера:
+	\begin{enumerate}
+		\item хранение истории сообщений,
+		\item загрузка и хранение картинок,
+		\item пересылка сообщений от одного пользователя в комнату,
+		\item доставка сообщений для появившегося в сети пользователя,
+		\item ответы на запросы пользователя,
+		\item периодическая проверка связи с клиентом.
+	\end{enumerate}
+	Функции клиента:
+	\begin{enumerate}
+		\item кэширование последних сообщений и картинок (для desktop- и android-приложений),
+		\item отправка сообщений на сервер,
+		\item отправка запросов пользователя.
+	\end{enumerate}
+	Методы сервера:
+	\begin{enumerate}
+		\item \texttt{is\_alive}
+		\item \texttt{new\_msg}
+		\item \texttt{send\_data}
+		\item \texttt{new\_room}
+	\end{enumerate}
+	Методы клиента:
+	\begin{enumerate}
+		\item \texttt{connect}
+		\item \texttt{still\_alive}
+		\item \texttt{send\_msg}
+		\item \texttt{send\_data}
+		\item \texttt{new\_room}
+		\item \texttt{get\_history}
+		\item \texttt{get\_statistics}
+		\item \texttt{get\_user\_status}
+		\item \texttt{get\_user\_id}
+		\item \texttt{get\_rooms\_id}
+		\item \texttt{get\_room\_users\_id}
+		\item \texttt{create\_room}
+		\item \texttt{synchronize}
+		\item \texttt{disconnect}
+	\end{enumerate}
+
+	\section{Некоторые детали реализации}
+	Сервер работает постоянно, поддерживая соединения со всеми клиентами в сети. При подключении клиент отправляет свои данные, и после их проверки сервер подтверждает подключение и начинает синхронизацию.
+	
+	Когда сообщение от отправителя приходит на сервер, он отправляет его получателю с теми же параметрами.
+	
+	Тяжелые объекты вроде картинок, истории или статистики, можно отправлять и получать в отдельном потоке.
+	
+	Картинки и ссылки в сообщении можно передавать, используя теги 
+	$\#\#[pict\_id = \dots]\#\#$ и $\#\#[href = \dots]\#\#$.
+	
+	Также нужно предусмотреть систему безопасности: загрузить картинку, историю, сообщение или статистику можно только являясь связанным с ними.
+	
+		
+\end{document}
