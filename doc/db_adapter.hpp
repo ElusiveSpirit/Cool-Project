@@ -1,70 +1,65 @@
-
-#define OK 1
-#define ERROR 0
-
-class User {
-
-
-private:
-
+User:
+    int id;
+    str login;
+    str password;
+//---------------
+Room:
+    int id;
+    str name;
+//---------------
+User-Room:
+    int id;
     int user_id;
-    char *login;
-    char *password;
+    int room_id;
+//---------------
+Message:
+    int id;
+    int user_id; // sender
+    int room_id;
+    str text;
+    Time time;
+    str theme;
+    bool read;
+//---------------
+Image:
+    int id;
+    int room_id;
+//---------------
+DBAdapter:
 
-}
+    bool open();
+    void close();
 
-class DB_Adapter {
+    bool is_user_exist(int user_id);
+    bool is_user_exist(str login);
+    bool is_room_exist(int room_id);
 
-public:
+    int register_user(str login, str password);
+    int register_room(str name);
+    int register_message(Message message);
+    int register_image(Image image);
 
-    // Этот момент надо расширить 
-    DB_Adapter( char *database_name );
+    void change_user_password(int user_id, str new_password);
+    void change_room_name(inr room_id, str name);
 
-// Работа с пользователями
-// -----------------------------------------------------------------------------
-    User *getUserByID( int user_id );        // Получения пользователя по id
-    // Проверка авторизации
-    bool checkAuth( int user_id, char *password );
-    bool checkAuth( char *login, char *password );
+    str get_user_login(int user_id);
+    int get_user_id(str login);
 
-    bool addUser( User user );            // Добавление пользователя в бд
+    str get_room_name(int room_id);
 
-// -----------------------------------------------------------------------------
+    bool check_user(str login, str password);
 
-// Работа с сообщениями
-// -----------------------------------------------------------------------------
+    [int] get_user_rooms(int user_id);
+    [int] get_users_in_room(int room_id);
+    bool is_user_in_room(int user_id, int room_id);
+    void add_user_to_room(int user_id, int room_id);
 
-    Message *getMessageByID( int message_id );
+    [Message] get_messages_in_room(int room_id, ??filter??);
 
-    // Если на вход подаётся size = -1, то выбираются 40 сообщений.
-    // Иначне по числу в size. По числу from опеределяется с какого сообщения
-    // по добавлению будет выборка. 0 - с последнего.
-    // 1 - с предпоследнего и т.д.
-    Message *getRoomMessages( int room_id, size_t &size, size_t from = 0 );
-    // По всем комнатам, в которых есть юзер
-    // Например, сначала вызов функции getUserRooms, а потом getRoomMessages
-    // к каждой
-    Message *getUserMessages( int user_id, size_t &size, size_t from = 0 );
-    // Тоже самое, но возращается только массив id-шек
-    int *getRoomMessagesIDs( int room_id, size_t &size, size_t from = 0 );
-    int *getUserMessagesIDs( int user_id, size_t &size, size_t from = 0 );
+    int get_image_room(int image_id);
 
-    bool addMessage( Message message );
-    // Обновляет данные в переменной сообщения
-    // Возврат true - если что-то изменилось
-    bool upDateMessage( Message &message );
-// -----------------------------------------------------------------------------
+    void mark_message(int message_id); //set read flag to message
 
-// Работа с комнатой
-// -----------------------------------------------------------------------------
-    Room *getRoomByID( int room_id );
-
-    bool addRoom( Room room );
-
-    Room *getUserRooms( int user_id, size_t &size, size_t from = 0 );
-    //int *getUserRoomsIDs( int user_id, size_t &size, size_t from = 0 );
-
-// -----------------------------------------------------------------------------
-
-
-}
+// Память под массивы и объекты выделяет адаптер. Можно возвращать только указателя на них. Сервер освободит память.
+// Нужно подумать над форматом фильтра для сообщений. Например: все сообщения, последние N сообщений во всех ветках, сообщения после определенного времени и т.д.
+// Нужно решить, каким будет формат времени.
